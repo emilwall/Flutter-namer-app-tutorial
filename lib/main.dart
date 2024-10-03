@@ -26,11 +26,12 @@ class MyApp extends StatelessWidget {
 }
 
 class BusinessLogic {
-  void toggle(favorites, current) {
-    if (favorites.contains(current)) {
-      favorites.remove(current);
+  void toggle<TKey, TValue>(
+      Map<TKey, TValue> map, TKey key, TValue defaultValue) {
+    if (map.containsKey(key)) {
+      map.remove(key);
     } else {
-      favorites.add(current);
+      map[key] = defaultValue;
     }
   }
 }
@@ -42,10 +43,16 @@ class MyAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  var favorites = <WordPair>[];
+  Map<WordPair, bool> favorites = {};
 
-  void toggleFavorite() {
-    BusinessLogic().toggle(favorites, current);
+  void toggleFavorite(WordPair pair) {
+    BusinessLogic().toggle(favorites, pair, false);
+    notifyListeners();
+  }
+
+  void toggleIcon(bool remove, WordPair pair) {
+    favorites[pair] = remove;
+    // favorites.update(key, (value) => !value, ifAbsent: () => false)
     notifyListeners();
   }
 }
@@ -61,7 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     Widget page = switch (selectedIndex) {
       0 => GeneratorPage(),
-      1 => Placeholder(),
+      1 => FavoritesPage(),
       _ => throw UnimplementedError('no widget for $selectedIndex')
     };
 
@@ -110,13 +117,9 @@ class GeneratorPage extends StatelessWidget {
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
     var pair = appState.current;
-
-    IconData icon;
-    if (appState.favorites.contains(pair)) {
-      icon = Icons.favorite;
-    } else {
-      icon = Icons.favorite_border;
-    }
+    var favoriteIcon = appState.favorites.containsKey(pair)
+        ? Icons.favorite
+        : Icons.favorite_border;
 
     return Center(
       child: Column(
@@ -129,9 +132,9 @@ class GeneratorPage extends StatelessWidget {
             children: [
               ElevatedButton.icon(
                 onPressed: () {
-                  appState.toggleFavorite();
+                  appState.toggleFavorite(pair);
                 },
-                icon: Icon(icon),
+                icon: Icon(favoriteIcon),
                 label: Text('Like'),
               ),
               SizedBox(width: 10),
@@ -144,6 +147,43 @@ class GeneratorPage extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class FavoritesPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<MyAppState>();
+    var favorites = appState.favorites;
+
+    return Center(
+      child: ListView(
+        children: favorites.isEmpty
+            ? [
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text('No favorites yet.'),
+                )
+              ]
+            : [
+                for (var entry in favorites.entries)
+                  ListTile(
+                    leading: ElevatedButton.icon(
+                      onPressed: () {
+                        print('toggle ${entry.key.asLowerCase}.');
+                        appState.toggleFavorite(entry.key);
+                      },
+                      icon: Icon(entry.value ? Icons.delete : Icons.favorite),
+                      label: Text(entry.key.asLowerCase),
+                      onHover: (entered) {
+                        print('${entry.key.asLowerCase} hover $entered');
+                        appState.toggleIcon(entered, entry.key);
+                      },
+                    ),
+                  )
+              ],
       ),
     );
   }
